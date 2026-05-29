@@ -29,41 +29,61 @@
 
   // ── JSONBin Storage ──────────────────────────────────────────────────────────
   const USE_CLOUD = JSONBIN_KEY && JSONBIN_BIN;
-  let _cache = null, _dirty = false, _timer = null;
+  let _cache = null, _timer = null;
+  const LS_KEY = "ironman_data";
+
+  // Always write to localStorage immediately as backup
+  function lsSave() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(_cache)); } catch {}
+  }
 
   async function fetchBin() {
     if (_cache) return _cache;
     if (!USE_CLOUD) {
-      try { _cache = JSON.parse(localStorage.getItem("ironman_data") || "{}"); }
+      try { _cache = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); }
       catch { _cache = {}; }
       return _cache;
     }
+    // Try JSONBin, fall back to localStorage if it fails
     try {
       const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN}/latest`,
         { headers: { "X-Master-Key": JSONBIN_KEY } });
       const data = await res.json();
-      _cache = data.record || {};
-    } catch { _cache = {}; }
+      if (data.record) {
+        _cache = data.record;
+        lsSave(); // sync to localStorage too
+      } else {
+        // JSONBin returned error, use localStorage
+        _cache = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+      }
+    } catch {
+      _cache = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+    }
     return _cache;
   }
 
   async function flushBin() {
-    if (!_dirty || !_cache) return;
-    _dirty = false;
-    if (!USE_CLOUD) { localStorage.setItem("ironman_data", JSON.stringify(_cache)); return; }
+    if (!_cache) return;
+    lsSave(); // always save locally first
+    if (!USE_CLOUD) return;
     try {
       await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "X-Master-Key": JSONBIN_KEY },
         body: JSON.stringify(_cache)
       });
-    } catch { _dirty = true; }
+    } catch { /* local backup already saved */ }
   }
 
-  function scheduleSave() { _dirty = true; clearTimeout(_timer); _timer = setTimeout(flushBin, 1200); }
-
+  // Save immediately (await) so data is never lost on navigation
   async function storageGet(key) { const d = await fetchBin(); return d[key] ?? null; }
-  async function storageSet(key, value) { await fetchBin(); _cache[key] = value; scheduleSave(); }
+  async function storageSet(key, value) {
+    await fetchBin();
+    _cache[key] = value;
+    lsSave(); // instant local save
+    clearTimeout(_timer);
+    _timer = setTimeout(flushBin, 800); // then sync to cloud
+  }
   function storageIsCloud() { return USE_CLOUD; }
 
   // ── Constants ────────────────────────────────────────────────────────────────
@@ -201,6 +221,7 @@
           <span style={{fontSize:10,color:T.textSoft,fontFamily:"system-ui,sans-serif"}}>{fmt(w.date)}</span>
         </div>
         <div style={{fontSize:11,color:T.textSoft,marginTop:2,display:"flex",gap:9,flexWrap:"wrap",fontFamily:"system-ui,sans-serif"}}>
+          {w.fitFile&&<span style={{background:T.accentBg,color:T.accent,padding:"1px 6px",borderRadius:6,fontWeight:600}}>📎 .fit</span>}
           {w.distance&&<span>📏 {w.distance}{disc==="swim"?"m":"km"}</span>}
           {w.duration&&<span>⏱ {w.duration}min</span>}
           {w.avgHR&&<span>❤️ {w.avgHR}bpm</span>}
@@ -289,6 +310,7 @@
     const now=new Date(), wStart=new Date(now); wStart.setDate(now.getDate()-now.getDay());
     const thisWeek=allW.filter(w=>new Date(w.date+"T12:00:00")>=wStart);
     const todayPlan=plan?.sessions?.filter(s=>s.date===todayKey)||[];
+    const totalSessions=allW.length;
 
     return <div>
       <div style={{background:"linear-gradient(160deg,#0e1b30,#0b2244,#080e1a)",padding:"26px 20px 22px",textAlign:"center",position:"relative",overflow:"hidden"}}>
@@ -303,7 +325,11 @@
 
       <div style={{padding:"0 16px"}}>
         <div style={{display:"flex",gap:8,marginTop:14}}>
-          {[{icon:"🏊",label:"Swim",val:(totalSwim/1000).toFixed(1)+"km",c:T.blue,bg:T.blueBg},{icon:"🚴",label:"Bike",val:totalBike.toFixed(0)+"km",c:T.yellow,bg:T.yellowBg},{icon:"🏃",label:"Run",val:totalRun.toFixed(1)+"km",c:T.green,bg:T.greenBg}].map(({icon,label,val,c,bg})=>(
+          {[
+            {icon:"🏊",label:"Swim",val:totalSwim>0?(totalSwim/1000).toFixed(1)+"km":allW.filter(w=>w.discipline==="swim").length+" ses",c:T.blue,bg:T.blueBg},
+            {icon:"🚴",label:"Bike",val:totalBike>0?totalBike.toFixed(0)+"km":allW.filter(w=>w.discipline==="bike").length+" ses",c:T.yellow,bg:T.yellowBg},
+            {icon:"🏃",label:"Run", val:totalRun>0?totalRun.toFixed(1)+"km":allW.filter(w=>w.discipline==="run").length+" ses",c:T.green,bg:T.greenBg}
+          ].map(({icon,label,val,c,bg})=>(
             <div key={label} style={{flex:1,background:bg,borderRadius:10,padding:"10px 6px",textAlign:"center",border:`1px solid ${c}22`}}>
               <div style={{fontSize:17}}>{icon}</div>
               <div style={{fontSize:14,fontWeight:700,color:c,marginTop:3}}>{val}</div>
