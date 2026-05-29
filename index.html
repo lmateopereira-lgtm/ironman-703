@@ -80,11 +80,20 @@
   const DISC_EMOJI = { swim:"🏊", bike:"🚴", run:"🏃", strength:"💪", rest:"😴", transition:"🔄" };
   const DISC_COLOR = { swim:T.blue, bike:T.yellow, run:T.green, strength:"#7C3AED", rest:T.textSoft, transition:"#0891B2" };
 
-  function daysUntil()   { return Math.max(0, Math.ceil((RACE_DATE - new Date()) / 86400000)); }
+  function daysUntil() {
+    const now = new Date();
+    const race = new Date(2026, 2, 7); // March 7 2026 — month is 0-indexed
+    const diffMs = race - new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.max(0, Math.ceil(diffMs / 86400000));
+  }
   function weeksUntil()  { return (daysUntil() / 7).toFixed(1); }
   function progressPct() {
-    const total = Math.ceil((RACE_DATE - new Date("2025-10-01")) / 86400000);
-    return Math.min(100, Math.max(0, Math.round(((total - daysUntil()) / total) * 100)));
+    const start = new Date(2025, 9, 1); // Oct 1 2025
+    const race  = new Date(2026, 2, 7); // Mar 7 2026
+    const today_ = new Date(); const now_ = new Date(today_.getFullYear(), today_.getMonth(), today_.getDate());
+    const total = Math.ceil((race - start) / 86400000);
+    const done  = Math.ceil((now_ - start) / 86400000);
+    return Math.min(100, Math.max(0, Math.round((done / total) * 100)));
   }
   function today() { return new Date().toISOString().slice(0,10); }
   function fmt(d)  { return new Date(d+"T12:00:00").toLocaleDateString("es-UY",{weekday:"short",day:"numeric",month:"short"}); }
