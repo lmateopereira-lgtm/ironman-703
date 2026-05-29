@@ -487,15 +487,25 @@
   // LOG TAB
   // ════════════════════════════════════════════════════════════════════════════
   function LogTab({workouts,health,onSaveWorkout,onSaveHealth}) {
-    const [mode,setMode]=useState("workout");
-    const [form,setForm]=useState({date:today(),discipline:"swim",distance:"",duration:"",avgHR:"",maxHR:"",calories:"",rpe:"5",notes:"",fitFile:null});
-    const [hForm,setHForm]=useState({date:today(),sleep:"",hrv:"",restingHR:"",stress:"",weight:"",notes:"",fitFile:null});
-    const [saved,setSaved]=useState(false);
+    const [mode,setMode]       = useState("workout");
+    const [inputMode,setInputMode] = useState("fit"); // "fit" | "manual"
+    const [form,setForm]       = useState({date:today(),discipline:"swim",distance:"",duration:"",avgHR:"",maxHR:"",calories:"",rpe:"5",notes:"",fitFile:null});
+    const [hForm,setHForm]     = useState({date:today(),sleep:"",hrv:"",restingHR:"",stress:"",weight:"",notes:"",fitFile:null});
+    const [saved,setSaved]     = useState(false);
     const fRef=useRef(), hRef=useRef();
     const flash=()=>{setSaved(true);setTimeout(()=>setSaved(false),2000);};
 
-    const saveW=()=>{if(!form.distance&&!form.duration)return;const k=form.date+"_"+Date.now();onSaveWorkout({...workouts,[k]:{...form,id:k}});flash();setForm({date:today(),discipline:"swim",distance:"",duration:"",avgHR:"",maxHR:"",calories:"",rpe:"5",notes:"",fitFile:null});};
+    const saveW=()=>{
+      // Allow save if .fit uploaded OR if manual fields filled
+      if(inputMode==="fit" && !form.fitFile) return;
+      if(inputMode==="manual" && !form.distance && !form.duration) return;
+      const k=form.date+"_"+Date.now();
+      onSaveWorkout({...workouts,[k]:{...form,id:k,inputMode}});
+      flash();
+      setForm({date:today(),discipline:"swim",distance:"",duration:"",avgHR:"",maxHR:"",calories:"",rpe:"5",notes:"",fitFile:null});
+    };
     const saveH=()=>{onSaveHealth({...health,[hForm.date]:{...hForm}});flash();};
+    const canSaveW = inputMode==="fit" ? !!form.fitFile : (!!form.distance||!!form.duration);
 
     return <div style={{padding:"16px"}}>
       <div style={{display:"flex",gap:8,marginBottom:18}}>
@@ -503,43 +513,92 @@
           <button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"10px",borderRadius:10,border:`1px solid ${mode===m?T.accent:T.border}`,cursor:"pointer",background:mode===m?T.accentBg:"#fff",color:mode===m?T.accent:T.textMid,fontFamily:"system-ui,sans-serif",fontWeight:600,fontSize:13}}>{l}</button>
         ))}
       </div>
+
       {mode==="workout"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+        {/* Input mode selector */}
+        <div style={{background:T.bgMuted,borderRadius:12,padding:"4px",display:"flex",gap:4}}>
+          {[["fit","📎 Subir .fit"],["manual","✏️ Manual"]].map(([m,l])=>(
+            <button key={m} onClick={()=>setInputMode(m)} style={{flex:1,padding:"9px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"system-ui,sans-serif",fontSize:13,fontWeight:600,transition:"all .2s",
+              background:inputMode===m?"#fff":"transparent",color:inputMode===m?T.accent:T.textSoft,
+              boxShadow:inputMode===m?"0 1px 3px rgba(0,0,0,0.1)":"none"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* Date + Sport — always shown */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           <LabeledInput label="Fecha" type="date" value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))}/>
-          <div><div style={{fontSize:10,color:T.textSoft,letterSpacing:1,textTransform:"uppercase",fontFamily:"system-ui,sans-serif",marginBottom:5}}>Deporte</div>
+          <div>
+            <div style={{fontSize:10,color:T.textSoft,letterSpacing:1,textTransform:"uppercase",fontFamily:"system-ui,sans-serif",marginBottom:5}}>Deporte</div>
             <select value={form.discipline} onChange={e=>setForm(p=>({...p,discipline:e.target.value}))} style={{width:"100%",background:"#fff",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:T.text,fontSize:14,fontFamily:"system-ui,sans-serif"}}>
-              <option value="swim">🏊 Natación</option><option value="bike">🚴 Bicicleta</option><option value="run">🏃 Running</option><option value="strength">💪 Fuerza</option><option value="transition">🔄 Transición</option><option value="rest">😴 Descanso</option>
-            </select></div>
+              <option value="swim">🏊 Natación</option>
+              <option value="bike">🚴 Bicicleta</option>
+              <option value="run">🏃 Running</option>
+              <option value="strength">💪 Fuerza</option>
+              <option value="transition">🔄 Transición</option>
+              <option value="rest">😴 Descanso</option>
+            </select>
+          </div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          <LabeledInput label="Distancia (km/m)" type="number" value={form.distance} onChange={e=>setForm(p=>({...p,distance:e.target.value}))}/>
-          <LabeledInput label="Duración (min)" type="number" value={form.duration} onChange={e=>setForm(p=>({...p,duration:e.target.value}))}/>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-          <LabeledInput label="FC Prom" type="number" value={form.avgHR} onChange={e=>setForm(p=>({...p,avgHR:e.target.value}))}/>
-          <LabeledInput label="FC Máx" type="number" value={form.maxHR} onChange={e=>setForm(p=>({...p,maxHR:e.target.value}))}/>
-          <LabeledInput label="Calorías" type="number" value={form.calories} onChange={e=>setForm(p=>({...p,calories:e.target.value}))}/>
-        </div>
-        <div style={{background:"#fff",borderRadius:10,padding:"12px",border:`1px solid ${T.border}`}}>
-          <div style={{fontSize:10,color:T.textSoft,letterSpacing:1,textTransform:"uppercase",fontFamily:"system-ui,sans-serif",marginBottom:8}}>RPE {form.rpe}/10</div>
-          <input type="range" min="1" max="10" value={form.rpe} onChange={e=>setForm(p=>({...p,rpe:e.target.value}))} style={{width:"100%",accentColor:T.accent}}/>
-        </div>
-        <LabeledInput label="Notas" value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} placeholder="Sensaciones…"/>
-        <FitUpload fileRef={fRef} onChange={e=>{const f=e.target.files[0];if(f)setForm(p=>({...p,fitFile:f.name}));}} fileName={form.fitFile} label="Subir .fit de entrenamiento"/>
-        <Btn onClick={saveW} saved={saved}>Guardar entrenamiento</Btn>
+
+        {/* FIT mode */}
+        {inputMode==="fit"&&<div>
+          <div style={{background:T.bgMuted,border:`2px dashed ${form.fitFile?T.green:T.border}`,borderRadius:12,padding:"20px",textAlign:"center"}}>
+            <input ref={fRef} type="file" accept=".fit" onChange={e=>{const f=e.target.files[0];if(f)setForm(p=>({...p,fitFile:f.name}));}} style={{display:"none"}}/>
+            {form.fitFile
+              ? <div>
+                  <div style={{fontSize:28,marginBottom:6}}>✅</div>
+                  <div style={{fontSize:14,fontWeight:600,color:T.green}}>{form.fitFile}</div>
+                  <div style={{fontSize:11,color:T.textSoft,marginTop:4,fontFamily:"system-ui,sans-serif"}}>Archivo listo para guardar</div>
+                  <button onClick={()=>setForm(p=>({...p,fitFile:null}))} style={{marginTop:10,background:"none",border:`1px solid ${T.border}`,borderRadius:8,padding:"5px 12px",color:T.textSoft,cursor:"pointer",fontFamily:"system-ui,sans-serif",fontSize:12}}>Cambiar</button>
+                </div>
+              : <div>
+                  <div style={{fontSize:32,marginBottom:8}}>📎</div>
+                  <div style={{fontSize:13,color:T.textMid,marginBottom:12}}>Subí el archivo <b>.fit</b> de Garmin Connect</div>
+                  <button onClick={()=>fRef.current.click()} style={{background:T.accentBg,border:`1px solid ${T.accent}44`,borderRadius:10,padding:"10px 20px",color:T.accent,cursor:"pointer",fontFamily:"system-ui,sans-serif",fontSize:14,fontWeight:600}}>Seleccionar archivo</button>
+                </div>
+            }
+          </div>
+          <LabeledInput label="Notas (opcional)" value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} placeholder="Sensaciones, comentarios…" style={{marginTop:10}}/>
+        </div>}
+
+        {/* MANUAL mode */}
+        {inputMode==="manual"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <LabeledInput label="Distancia (km/m)" type="number" value={form.distance} onChange={e=>setForm(p=>({...p,distance:e.target.value}))}/>
+            <LabeledInput label="Duración (min)"   type="number" value={form.duration} onChange={e=>setForm(p=>({...p,duration:e.target.value}))}/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            <LabeledInput label="FC Prom"  type="number" value={form.avgHR}    onChange={e=>setForm(p=>({...p,avgHR:e.target.value}))}/>
+            <LabeledInput label="FC Máx"   type="number" value={form.maxHR}    onChange={e=>setForm(p=>({...p,maxHR:e.target.value}))}/>
+            <LabeledInput label="Calorías" type="number" value={form.calories} onChange={e=>setForm(p=>({...p,calories:e.target.value}))}/>
+          </div>
+          <div style={{background:"#fff",borderRadius:10,padding:"12px",border:`1px solid ${T.border}`}}>
+            <div style={{fontSize:10,color:T.textSoft,letterSpacing:1,textTransform:"uppercase",fontFamily:"system-ui,sans-serif",marginBottom:8}}>RPE {form.rpe}/10</div>
+            <input type="range" min="1" max="10" value={form.rpe} onChange={e=>setForm(p=>({...p,rpe:e.target.value}))} style={{width:"100%",accentColor:T.accent}}/>
+          </div>
+          <LabeledInput label="Notas" value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} placeholder="Sensaciones…"/>
+        </div>}
+
+        <Btn onClick={saveW} saved={saved} disabled={!canSaveW}>
+          {inputMode==="fit"?"Guardar entreno (.fit)":"Guardar entreno"}
+        </Btn>
       </div>}
+
       {mode==="health"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
         <LabeledInput label="Fecha" type="date" value={hForm.date} onChange={e=>setHForm(p=>({...p,date:e.target.value}))}/>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          <LabeledInput label="Horas sueño" type="number" value={hForm.sleep} onChange={e=>setHForm(p=>({...p,sleep:e.target.value}))}/>
-          <LabeledInput label="HRV" type="number" value={hForm.hrv} onChange={e=>setHForm(p=>({...p,hrv:e.target.value}))}/>
+          <LabeledInput label="Horas sueño" type="number" value={hForm.sleep}     onChange={e=>setHForm(p=>({...p,sleep:e.target.value}))}/>
+          <LabeledInput label="HRV"          type="number" value={hForm.hrv}       onChange={e=>setHForm(p=>({...p,hrv:e.target.value}))}/>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          <LabeledInput label="FC reposo" type="number" value={hForm.restingHR} onChange={e=>setHForm(p=>({...p,restingHR:e.target.value}))}/>
-          <LabeledInput label="Estrés 1–10" type="number" value={hForm.stress} onChange={e=>setHForm(p=>({...p,stress:e.target.value}))}/>
+          <LabeledInput label="FC reposo"   type="number" value={hForm.restingHR} onChange={e=>setHForm(p=>({...p,restingHR:e.target.value}))}/>
+          <LabeledInput label="Estrés 1–10" type="number" value={hForm.stress}    onChange={e=>setHForm(p=>({...p,stress:e.target.value}))}/>
         </div>
         <LabeledInput label="Peso (kg)" type="number" value={hForm.weight} onChange={e=>setHForm(p=>({...p,weight:e.target.value}))}/>
-        <LabeledInput label="Notas" value={hForm.notes} onChange={e=>setHForm(p=>({...p,notes:e.target.value}))} placeholder="Cómo te sentiste…"/>
+        <LabeledInput label="Notas"     value={hForm.notes} onChange={e=>setHForm(p=>({...p,notes:e.target.value}))} placeholder="Cómo te sentiste…"/>
         <FitUpload fileRef={hRef} onChange={e=>{const f=e.target.files[0];if(f)setHForm(p=>({...p,fitFile:f.name}));}} fileName={hForm.fitFile} label="Subir .fit de salud (Garmin 745)" note="Incluye sueño, HRV y FC reposo"/>
         <Btn onClick={saveH} saved={saved}>Guardar salud</Btn>
       </div>}
