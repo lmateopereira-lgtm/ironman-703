@@ -76,14 +76,14 @@
     yellow:"#D97706", yellowBg:"#FEF9EB",
   };
 
-  const RACE_DATE  = new Date("2026-03-07T00:00:00");
+  const RACE_DATE  = new Date("2026-03-07T23:59:59");
   const DISC_EMOJI = { swim:"🏊", bike:"🚴", run:"🏃", strength:"💪", rest:"😴", transition:"🔄" };
   const DISC_COLOR = { swim:T.blue, bike:T.yellow, run:T.green, strength:"#7C3AED", rest:T.textSoft, transition:"#0891B2" };
 
   function daysUntil()   { return Math.max(0, Math.ceil((RACE_DATE - new Date()) / 86400000)); }
   function weeksUntil()  { return (daysUntil() / 7).toFixed(1); }
   function progressPct() {
-    const total = Math.ceil((RACE_DATE - new Date("2025-09-01")) / 86400000);
+    const total = Math.ceil((RACE_DATE - new Date("2025-10-01")) / 86400000);
     return Math.min(100, Math.max(0, Math.round(((total - daysUntil()) / total) * 100)));
   }
   function today() { return new Date().toISOString().slice(0,10); }
